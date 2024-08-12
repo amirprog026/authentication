@@ -196,3 +196,40 @@ function handle_token_login() {
     }
 }
 add_action('template_redirect', 'handle_token_login');
+
+//-----------------------------------user_exists_endpoint------------------------------------------
+
+function check_user_exists( WP_REST_Request $request ) {
+    $username = $request->get_param('username');
+    
+    if ( empty( $username ) ) {
+        return new WP_REST_Response( 
+            array( 'exists' => false, 'message' => 'Username parameter is required.' ), 
+            400 
+        );
+    }
+
+    $user = get_user_by( 'login', $username );
+
+    if ( $user ) {
+        return new WP_REST_Response( 
+            array( 'exists' => true, 'message' => 'User exists.' ), 
+            200 
+        );
+    } else {
+        return new WP_REST_Response( 
+            array( 'exists' => false, 'message' => 'User does not exist.' ), 
+            404 
+        );
+    }
+}
+
+function register_user_exists_route() {
+    register_rest_route( 'custom/v1', '/user-exists/', array(
+        'methods' => 'GET',
+        'callback' => 'check_user_exists',
+    ));
+}
+
+add_action( 'rest_api_init', 'register_user_exists_route' );
+
