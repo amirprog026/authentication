@@ -1,4 +1,56 @@
 <?php
+
+class AlertSMS {
+    private $code;
+    private $numbers;
+    private $pattern;
+
+    public function setter($numbers, $code, $pattern) {
+        $this->numbers = $numbers;
+        $this->code = $code;
+        $this->pattern = $pattern;
+    }
+
+    public function getter() {
+        return $this->sms_api();
+    }
+
+    private function sms_api() {
+        $username = 'x';
+        $password = 'x';
+        $from_number = "+983000505";
+        $pattern_code = $this->pattern;
+        $to = $this->numbers;
+        $code = $this->code;
+        $input_data = ["verification-code" => $code];
+
+        $url = "https://ippanel.com/patterns/pattern?username=$username&password=" . urlencode($password) .
+               "&from=$from_number&to=" . json_encode($to) .
+               "&input_data=" . urlencode(json_encode($input_data)) .
+               "&pattern_code=$pattern_code";
+
+        $options = [
+            'http' => [
+                'method' => 'POST',
+                'header' => 'Content-type: application/x-www-form-urlencoded',
+                'content' => http_build_query($input_data),
+            ],
+        ];
+
+        $context = stream_context_create($options);
+        $response = file_get_contents($url, false, $context);
+
+        return $response;
+    }
+}
+
+?>
+
+
+<?php
+
+$NUMBERS_token=array();
+
 session_start();
 define('URLPREFIX', 'https://Admin-yar.com/wp-json/custom/v1');
 define('WP_SITE', 'Admin-yar.com/');
@@ -111,30 +163,40 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             break;
 
         case 'send_sms_code':
+            global $NUMBERS_token;
             $num = $_POST['phone_number'];
             if (!$num) {
                 echo json_encode(["message" => "Error! number does not exist in parameters"]);
                 http_response_code(500);
                 exit();
             }
-
+        
             $exists = file_get_contents("https://admin-yar.com/wp-json/custom/v1/user-exists/?username=$num");
             if ($exists === "200") {
                 echo json_encode(["message" => "user already Exists!"]);
                 http_response_code(201);
             } else {
+                $sms = new AlertSMS();
                 $sms_code = generate_sms_token();
-                $_SESSION['NUMBERS_token'][$num] = $sms_code;
-                // Replace with your SMS API call
+                $NUMBERS_token[$num] = $sms_code;
+        
+                $sms->setter([$num], $sms_code, '4wec8ylfmc9gtxl'); // Use your pattern code
+                $sms->getter(); // This will trigger the SMS API
+        
                 echo json_encode(['message' => 'کد پیامک ارسال شد']);
                 http_response_code(200);
             }
             break;
 
         case 'verify_sms_code':
+            global $NUMBERS_token;
             $sms_code = $_POST['sms_code'];
             $num = $_POST['number'];
-            if ($_SESSION['NUMBERS_token'][$num] == $sms_code) {
+            echo json_encode($NUMBERS_token);
+            http_response_code(200);
+            var_dump($NUMBERS_token);
+            break;
+            if ($NUMBERS_token[$num] == $sms_code) {
                 $resp = wp_register($num, $num, "$num@admin-yar.com");
                 if ($resp !== null) {
                     echo json_encode(['message' => 'کد تایید شد', 'user_id' => $resp["user_id"]]);
@@ -144,9 +206,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             } else {
                 echo json_encode("error");
-                http_response_code(400);
+               http_response_code(400);
             }
-            break;
+           break;
 
         case 'upload_resume':
             if (isset($_FILES['file']) && $_FILES['file']['type'] == 'application/pdf' && $_FILES['file']['size'] <= 2097152) {
@@ -179,6 +241,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 } else {
     // Load the index page (HTML form)
-    include 'index.html';
+   // include 'index.html';
+   echo"loading form";
 }
 ?>
